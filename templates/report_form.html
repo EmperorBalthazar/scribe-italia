@@ -4,7 +4,11 @@
 <form method="post" class="report-form">
   <div class="grid two">
     <label>Città<select name="city_id" required>{% for c in cities %}<option value="{{ c.id }}" {% if form_data and form_data.city_id == c.id %}selected{% endif %}>{{ c.name }} — {{ c.province.name }}</option>{% endfor %}</select></label>
-    <label>Data<input type="date" name="report_date" value="{{ today }}" required></label>
+    {% if current_user.role == 'officer' %}
+      <div class="date-display"><span class="field-label">Data</span><strong>{{ today[8:10] }}/{{ today[5:7] }}/{{ today[0:4] }}</strong><small>La data del rapporto è impostata automaticamente.</small></div>
+    {% else %}
+      <label>Data<input type="date" name="report_date" value="{{ today }}" required></label>
+    {% endif %}
   </div>
   <label>1. Persone in città<textarea name="people" rows="10" placeholder="Incolla qui la lista delle persone..." required>{{ form_data.people if form_data else '' }}</textarea></label>
   <label>2. Gruppi<textarea name="groups" rows="10" placeholder="Incolla qui gruppi e lance...">{{ form_data.groups if form_data else '' }}</textarea></label>

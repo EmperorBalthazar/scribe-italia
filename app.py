@@ -159,9 +159,12 @@ def parse_people(text):
             pipe_cells = [c.strip() for c in before_pr.split('|') if c.strip()]
             name_part = pipe_cells[0] if pipe_cells else before_pr
 
-        # Titles/descriptions after the first comma are not part of the login.
+        # RK nicknames do not contain spaces. Titles, noble names and other
+        # descriptive text may follow the login, therefore the nickname ends
+        # at the first comma OR the first whitespace, whichever comes first.
         nickname = name_part.split(',', 1)[0].strip()
         nickname = re.sub(r'^[-–—•]+\s*', '', nickname).strip()
+        nickname = nickname.split()[0] if nickname.split() else ''
 
         if not nickname or nickname.lower() in {'nome', 'nickname', 'personaggio'}:
             continue
@@ -367,7 +370,10 @@ def generate_bbcode(city, report_date, raw_sightings, people, groups, armies,
     lines.append(f'[color=darkred][size=14][b][u]PERSONE IN LISTA NEMICI[/u] :[/b][/size][/color][color=blue][b]{len(enemies_present)}[/b][/color]')
     lines.append('')
     for enemy in enemies_present:
-        lines.append(f'[color=red][b][char]{enemy.nickname}[/char][/b][/color]')
+        enemy_line = f'[color=red][b][char]{enemy.nickname}[/char][/b][/color]'
+        if enemy.note:
+            enemy_line += f' - [b]Motivo:[/b] {enemy.note}'
+        lines.append(enemy_line)
     if not enemies_present:
         lines.append('Nessuna persona in lista nemici presente.')
 
@@ -375,11 +381,11 @@ def generate_bbcode(city, report_date, raw_sightings, people, groups, armies,
     if previous_report:
         lines.append(f'[b]Rapporto precedente:[/b] {previous_report.report_date.strftime("%d/%m/%Y")}')
         lines.append('')
-        lines.append(f'[b]Nuovi presenti:[/b] {len(new_people)}')
+        lines.append(f'[b]Arrivati:[/b] {len(new_people)}')
         for nickname in new_people:
             lines.append(f'[char]{nickname}[/char]')
         lines.append('')
-        lines.append(f'[b]Non più presenti:[/b] {len(departed_people)}')
+        lines.append(f'[b]Partiti:[/b] {len(departed_people)}')
         for nickname in departed_people:
             lines.append(f'[char]{nickname}[/char]')
         lines.append('')
@@ -421,8 +427,16 @@ def generate_bbcode(city, report_date, raw_sightings, people, groups, armies,
         '',
         '[color=darkred][size=14][b][u]NOTE[/u][/b][/size][/color]',
         '',
-        '[/quote]',
     ]
+    if enemies_present:
+        details = []
+        for enemy in enemies_present:
+            if enemy.note:
+                details.append(f'{enemy.nickname} ({enemy.note})')
+            else:
+                details.append(enemy.nickname)
+        lines.append('[color=red][b]ATTENZIONE:[/b][/color] Nel rapporto risultano presenti persone in lista nemici: ' + ', '.join(details) + '.')
+    lines.append('[/quote]')
     return '\n'.join(lines)
 
 
@@ -489,6 +503,8 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    if current_user.role == ROLE_OFFICER:
+        return redirect(url_for('new_report'))
     pending = []
     if current_user.role == ROLE_ADMIN:
         pending = User.query.filter_by(role=ROLE_OFFICER, approved=False).all()
@@ -505,14 +521,17 @@ def new_report():
     allowed_ids = {c.id for c in cities}
     if request.method == 'POST':
         city_id = request.form.get('city_id', type=int)
-        date_str = request.form.get('report_date', '')
         if city_id not in allowed_ids:
             abort(403)
-        try:
-            report_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-        except ValueError:
-            flash('Data non valida.', 'danger')
-            return render_template('report_form.html', cities=cities, today=date.today().isoformat())
+        if current_user.role == ROLE_OFFICER:
+            report_date = date.today()
+        else:
+            date_str = request.form.get('report_date', '')
+            try:
+                report_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                flash('Data non valida.', 'danger')
+                return render_template('report_form.html', cities=cities, today=date.today().isoformat())
 
         if Report.query.filter_by(city_id=city_id, report_date=report_date).first():
             flash('Esiste già un rapporto per questa città e questa data.', 'danger')
@@ -581,6 +600,7 @@ def new_report():
 
 @app.route('/reports')
 @login_required
+@role_required(ROLE_ADMIN, ROLE_PREFECT)
 def reports():
     q = Report.query.join(City)
     if current_user.role == ROLE_PREFECT:
@@ -656,7 +676,21 @@ def enemies():
 
         if action in {'bulk_preview', 'bulk_import'}:
             bulk_text = request.form.get('bulk_text', '')
-            parsed = parse_enemy_bulk(bulk_text)
+            if action == 'bulk_import':
+                # The preview is intentionally editable. Empty fields are
+                # treated as rows the user chose to discard. As RK nicknames
+                # cannot contain spaces, keep only the first token.
+                parsed = []
+                seen_edited = set()
+                for raw_name in request.form.getlist('parsed_names'):
+                    cleaned = _clean_enemy_candidate(raw_name)
+                    cleaned = cleaned.split()[0] if cleaned.split() else ''
+                    if cleaned and cleaned.casefold() not in seen_edited:
+                        seen_edited.add(cleaned.casefold())
+                        parsed.append(cleaned)
+            else:
+                parsed = parse_enemy_bulk(bulk_text)
+
             if not province_id:
                 flash('Seleziona una provincia.', 'danger')
             elif not parsed:
@@ -735,7 +769,8 @@ def users():
         items = User.query.filter(
             or_(User.province_id == current_user.province_id, User.requested_province_id == current_user.province_id)
         ).order_by(User.created_at.desc()).all()
-    return render_template('users.html', users=items)
+    provinces = Province.query.order_by(Province.name).all() if current_user.role == ROLE_ADMIN else []
+    return render_template('users.html', users=items, provinces=provinces)
 
 
 @app.route('/users/<int:user_id>/approve', methods=['POST'])
@@ -765,6 +800,40 @@ def reject_user(user_id):
     db.session.commit()
     flash('Richiesta rifiutata e account eliminato.', 'success')
     return redirect(request.referrer or url_for('users'))
+
+
+@app.route('/users/<int:user_id>/role', methods=['POST'])
+@login_required
+@role_required(ROLE_ADMIN)
+def set_user_role(user_id):
+    user = db.session.get(User, user_id) or abort(404)
+    if user.id == current_user.id:
+        flash('Per sicurezza non puoi modificare il ruolo del tuo stesso account da questa schermata.', 'warning')
+        return redirect(url_for('users'))
+
+    role = request.form.get('role', '').strip()
+    province_id = request.form.get('province_id', type=int)
+    if role not in {ROLE_ADMIN, ROLE_PREFECT, ROLE_OFFICER}:
+        abort(400)
+    if role in {ROLE_PREFECT, ROLE_OFFICER} and not province_id:
+        flash('Per Prefetti e Doganieri devi selezionare una provincia.', 'danger')
+        return redirect(url_for('users'))
+    if province_id and not db.session.get(Province, province_id):
+        abort(400)
+
+    CityAuthorization.query.filter_by(user_id=user.id).delete()
+    user.role = role
+    user.approved = True
+    if role == ROLE_ADMIN:
+        user.province_id = None
+        user.requested_province_id = None
+    else:
+        user.province_id = province_id
+        user.requested_province_id = province_id
+    db.session.commit()
+    labels = {ROLE_ADMIN: 'Admin Centrale', ROLE_PREFECT: 'Prefetto', ROLE_OFFICER: 'Doganiere'}
+    flash(f'Ruolo di {user.nickname} aggiornato a {labels[role]}.', 'success')
+    return redirect(url_for('users'))
 
 
 @app.route('/users/<int:user_id>/authorizations', methods=['GET', 'POST'])

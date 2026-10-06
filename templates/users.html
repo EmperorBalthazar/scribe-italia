@@ -1,9 +1,41 @@
 {% extends 'base.html' %}{% block content %}
 <h1>Gestione utenti</h1>
 <table><thead><tr><th>Nickname</th><th>Ruolo</th><th>Provincia</th><th>Stato</th><th>Azioni</th></tr></thead><tbody>
-{% for u in users %}<tr><td>{{ u.nickname }}</td><td>{{ u.role }}</td><td>{{ u.province.name if u.province else (u.requested_province.name if u.requested_province else '-') }}</td><td>{{ 'Approvato' if u.approved else 'In attesa' }}</td><td>
-{% if u.role == 'officer' and not u.approved %}<form class="inline" method="post" action="{{ url_for('approve_user', user_id=u.id) }}"><button>Approva</button></form><form class="inline" method="post" action="{{ url_for('reject_user', user_id=u.id) }}"><button class="danger-btn">Rifiuta</button></form>{% endif %}
-{% if u.role == 'officer' and u.approved %}<a href="{{ url_for('user_authorizations', user_id=u.id) }}">Autorizza città</a>{% endif %}
-</td></tr>{% endfor %}
+{% for u in users %}
+<tr>
+  <td>{{ u.nickname }}</td>
+  <td>{{ {'admin':'Admin Centrale','prefect':'Prefetto','officer':'Doganiere'}.get(u.role, u.role) }}</td>
+  <td>{{ u.province.name if u.province else (u.requested_province.name if u.requested_province else '-') }}</td>
+  <td>{{ 'Approvato' if u.approved else 'In attesa' }}</td>
+  <td>
+    {% if u.role == 'officer' and not u.approved %}
+      <form class="inline" method="post" action="{{ url_for('approve_user', user_id=u.id) }}"><button>Approva</button></form>
+      <form class="inline" method="post" action="{{ url_for('reject_user', user_id=u.id) }}"><button class="danger-btn">Rifiuta</button></form>
+    {% endif %}
+    {% if u.role == 'officer' and u.approved %}<a href="{{ url_for('user_authorizations', user_id=u.id) }}">Autorizza città</a>{% endif %}
+    {% if current_user.role == 'admin' and u.id != current_user.id %}
+      <details class="role-editor">
+        <summary>Modifica ruolo</summary>
+        <form method="post" action="{{ url_for('set_user_role', user_id=u.id) }}" class="role-form">
+          <label>Ruolo
+            <select name="role" required>
+              <option value="officer" {% if u.role == 'officer' %}selected{% endif %}>Doganiere</option>
+              <option value="prefect" {% if u.role == 'prefect' %}selected{% endif %}>Prefetto</option>
+              <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin Centrale</option>
+            </select>
+          </label>
+          <label>Provincia
+            <select name="province_id">
+              <option value="">Nessuna / non applicabile</option>
+              {% for p in provinces %}<option value="{{ p.id }}" {% if u.province_id == p.id or (not u.province_id and u.requested_province_id == p.id) %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+            </select>
+          </label>
+          <button class="primary small" type="submit">Salva ruolo</button>
+        </form>
+      </details>
+    {% endif %}
+  </td>
+</tr>
+{% endfor %}
 </tbody></table>
 {% endblock %}

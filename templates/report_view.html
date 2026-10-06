@@ -15,7 +15,32 @@
   <section>
     <h2>BBCode</h2>
     <textarea id="bbcode" rows="28" readonly>{{ report.bbcode }}</textarea>
-    <button class="primary" onclick="navigator.clipboard.writeText(document.getElementById('bbcode').value).then(()=>alert('BBCode copiato!'))">Copia BBCode</button>
+    <button class="primary" type="button" onclick="copyBBCode()">Copia BBCode</button>
+    <p id="copy-status" class="muted" aria-live="polite"></p>
   </section>
 </div>
+<script>
+async function copyBBCode() {
+  const textarea = document.getElementById('bbcode');
+  const status = document.getElementById('copy-status');
+  const text = textarea.value;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+      const ok = document.execCommand('copy');
+      if (!ok) throw new Error('copy command failed');
+    }
+    status.textContent = 'BBCode copiato negli appunti.';
+  } catch (err) {
+    textarea.focus();
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+    status.textContent = 'Copia automatica non riuscita: premi Ctrl+C, poi incolla con Ctrl+V.';
+  }
+}
+</script>
 {% endblock %}

@@ -19,8 +19,8 @@
       </select>
     </label>
     {% endif %}
-    <label>Nota facoltativa
-      <input type="text" name="note" maxlength="255" placeholder="Motivo o riferimento interno">
+    <label>Motivo / nota
+      <input type="text" name="note" maxlength="255" placeholder="Es. Ricercato per...">
     </label>
     <div><button class="primary" type="submit">Aggiungi alla lista nemici</button></div>
   </form>
@@ -28,7 +28,7 @@
 
 <section class="card">
   <h2>Importazione massiva</h2>
-  <p class="muted">Incolla direttamente una lista dal forum. I nickname ripetuti due volte vengono riconosciuti automaticamente e le diciture “già noto come” vengono ignorate.</p>
+  <p class="muted">Incolla direttamente una lista dal forum. Dopo l'analisi puoi correggere manualmente ogni nickname prima dell'importazione. Le diciture “già noto come” vengono ignorate.</p>
   <form method="post">
     <input type="hidden" name="action" value="bulk_preview">
     {% if current_user.role == 'admin' %}
@@ -50,19 +50,22 @@
     <h3>Anteprima importazione</h3>
     <p><strong>{{ preview_names|length }}</strong> nuovi nominativi riconosciuti; <strong>{{ preview_existing|length }}</strong> già presenti.</p>
     {% if preview_names %}
-      <div class="name-grid">
-        {% for n in preview_names %}<span class="name-chip">✓ {{ n }}</span>{% endfor %}
-      </div>
+      <form method="post" class="confirm-import">
+        <input type="hidden" name="action" value="bulk_import">
+        {% if current_user.role == 'admin' %}<input type="hidden" name="province_id" value="{{ selected_province_id }}">{% endif %}
+        <textarea name="bulk_text" hidden>{{ bulk_text }}</textarea>
+        <div class="editable-name-list">
+          {% for n in preview_names %}
+          <label class="editable-name-row"><span>{{ loop.index }}.</span><input type="text" name="parsed_names" value="{{ n }}" aria-label="Nickname {{ loop.index }}"></label>
+          {% endfor %}
+        </div>
+        <p class="muted">Correggi eventuali errori. Se vuoi escludere un nominativo, svuota il relativo campo.</p>
+        <button class="primary" type="submit">Importa nominativi confermati</button>
+      </form>
     {% endif %}
     {% if preview_existing %}
       <p class="muted"><strong>Già presenti e non duplicati:</strong> {{ preview_existing|join(', ') }}</p>
     {% endif %}
-    <form method="post" class="confirm-import">
-      <input type="hidden" name="action" value="bulk_import">
-      {% if current_user.role == 'admin' %}<input type="hidden" name="province_id" value="{{ selected_province_id }}">{% endif %}
-      <textarea name="bulk_text" hidden>{{ bulk_text }}</textarea>
-      <button class="primary" type="submit">Importa {{ preview_names|length }} nuovi nominativi</button>
-    </form>
   </div>
   {% endif %}
 </section>
@@ -70,7 +73,7 @@
 <section class="card">
   <h2>Persone registrate</h2>
   <table>
-    <thead><tr><th>Nickname</th><th>Provincia</th><th>Nota</th><th></th></tr></thead>
+    <thead><tr><th>Nickname</th><th>Provincia</th><th>Motivo / nota</th><th></th></tr></thead>
     <tbody>
       {% for e in enemies %}
       <tr>

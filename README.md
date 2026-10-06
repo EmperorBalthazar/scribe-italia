@@ -40,3 +40,14 @@ Con ambiente virtuale attivo:
 - Le diciture "già noto come" e i vecchi alias vengono ignorati.
 - I duplicati già presenti nel database non vengono reinseriti.
 - Aggiunti Gunicorn, PostgreSQL driver, Procfile e versione Python per facilitare il deploy online.
+
+## Novità v1.5
+- Parser persone: il nickname termina al primo spazio (oltre che alla prima virgola).
+- Movimenti rinominati in **Arrivati** e **Partiti**.
+- Lista nemici: il motivo compare nel report e viene richiamato anche nelle NOTE.
+- Importazione massiva nemici: i nickname analizzati possono essere corretti prima dell'importazione.
+- Admin: gestione del ruolo utente (Admin Centrale / Prefetto / Doganiere) e relativa provincia.
+- Doganieri: interfaccia ridotta al solo flusso di nuovo rapporto; niente storico e nessuna cancellazione.
+- Doganieri: data del rapporto automatica e non modificabile.
+- Copia BBCode: aggiunto fallback compatibile con browser che bloccano l'API Clipboard.
+- Autorizzazioni città: checkbox riallineate e più leggibili.

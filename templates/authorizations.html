@@ -1,4 +1,11 @@
 {% extends 'base.html' %}{% block content %}
 <h1>Autorizzazioni di {{ user.nickname }}</h1>
-<form method="post"><div class="checkbox-list">{% for c in cities %}<label><input type="checkbox" name="city_ids" value="{{ c.id }}" {% if c.id in current %}checked{% endif %}> {{ c.name }}</label>{% endfor %}</div><button class="primary">Salva autorizzazioni</button></form>
+<form method="post">
+  <div class="checkbox-list city-auth-list">
+    {% for c in cities %}
+      <label class="city-auth-row"><span>{{ c.name }}</span><input type="checkbox" name="city_ids" value="{{ c.id }}" {% if c.id in current %}checked{% endif %}></label>
+    {% endfor %}
+  </div>
+  <button class="primary">Salva autorizzazioni</button>
+</form>
 {% endblock %}
