@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% block title %}Lista nemici{% endblock %}
+{% block title %}Persone da monitorare{% endblock %}
 {% block content %}
-<h1>Lista nemici</h1>
+<h1>Persone da monitorare</h1>
 <p class="muted">I nominativi inseriti qui vengono confrontati automaticamente con le persone presenti nei nuovi rapporti. Ogni Prefetto gestisce soltanto la lista della propria provincia.</p>
 
 <section class="card">
@@ -20,15 +20,15 @@
     </label>
     {% endif %}
     <label>Motivo / nota
-      <input type="text" name="note" maxlength="255" placeholder="Es. Ricercato per...">
+      <input type="text" name="note" maxlength="255" placeholder="Es. Sorvegliare i movimenti">
     </label>
-    <div><button class="primary" type="submit">Aggiungi alla lista nemici</button></div>
+    <div><button class="primary" type="submit">Aggiungi alle persone da monitorare</button></div>
   </form>
 </section>
 
 <section class="card">
   <h2>Importazione massiva</h2>
-  <p class="muted">Incolla direttamente una lista dal forum. Dopo l'analisi puoi correggere manualmente ogni nickname prima dell'importazione. Le diciture “già noto come” vengono ignorate. Il nickname termina al primo spazio: per esempio “Artair Artair” viene riconosciuto come “Artair”.</p>
+  <p class="muted">Incolla direttamente una lista dal forum. Il nickname termina al primo spazio: per esempio “Artair Artair” viene riconosciuto come “Artair”. Dopo l'analisi puoi correggere manualmente ogni nickname prima dell'importazione.</p>
   <form method="post">
     <input type="hidden" name="action" value="bulk_preview">
     {% if current_user.role == 'admin' %}
@@ -40,7 +40,7 @@
     </label>
     {% endif %}
     <label>Lista da importare
-      <textarea name="bulk_text" rows="12" placeholder="Incolla qui la lista nemici...">{{ bulk_text }}</textarea>
+      <textarea name="bulk_text" rows="12" placeholder="Incolla qui la lista...">{{ bulk_text }}</textarea>
     </label>
     <button class="primary" type="submit">Analizza lista</button>
   </form>
@@ -75,19 +75,19 @@
   <table>
     <thead><tr><th>Nickname</th><th>Provincia</th><th>Motivo / nota</th><th></th></tr></thead>
     <tbody>
-      {% for e in enemies %}
+      {% for e in monitored %}
       <tr>
         <td><strong>{{ e.nickname }}</strong></td>
         <td>{{ e.province.name }}</td>
         <td>{{ e.note or '—' }}</td>
         <td>
-          <form method="post" action="{{ url_for('delete_enemy', enemy_id=e.id) }}" onsubmit="return confirm('Rimuovere {{ e.nickname }} dalla lista nemici?');">
+          <form method="post" action="{{ url_for('delete_monitored', item_id=e.id) }}" onsubmit="return confirm('Rimuovere {{ e.nickname }} dalle persone da monitorare?');">
             <button class="danger" type="submit">Rimuovi</button>
           </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="4">Nessuna persona presente nella lista nemici.</td></tr>
+      <tr><td colspan="4">Nessuna persona presente nella lista da monitorare.</td></tr>
       {% endfor %}
     </tbody>
   </table>

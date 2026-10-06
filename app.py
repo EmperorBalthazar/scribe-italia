@@ -82,6 +82,17 @@ class Enemy(db.Model):
     __table_args__ = (UniqueConstraint('nickname', 'province_id', name='uq_enemy_province'),)
 
 
+class MonitoredPerson(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nickname = db.Column(db.String(80), nullable=False)
+    province_id = db.Column(db.Integer, db.ForeignKey('province.id'), nullable=False)
+    note = db.Column(db.String(255), default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    province = db.relationship('Province')
+    __table_args__ = (UniqueConstraint('nickname', 'province_id', name='uq_monitored_province'),)
+
+
 class Report(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     city_id = db.Column(db.Integer, db.ForeignKey('city.id'), nullable=False)
@@ -178,14 +189,14 @@ def parse_people(text):
     return results
 
 
-def _clean_enemy_candidate(value):
+def _clean_list_candidate(value):
     value = re.sub(r'[*`]', '', value or '').strip()
     value = re.sub(r'^[\s\-–—•]+', '', value).strip()
     value = re.sub(r'\s+', ' ', value)
     return value.strip()
 
 
-def parse_enemy_bulk(text):
+def parse_bulk_names(text):
     """Extract current nicknames from pasted enemy lists.
 
     Supports Markdown copies from the RK forum such as:
@@ -209,14 +220,14 @@ def parse_enemy_bulk(text):
         # Preferred format: Markdown link label.
         md = re.search(r'\[\s*\*?([^]\n]+?)\*?\s*\]\s*\(', line)
         if md:
-            candidate = _clean_enemy_candidate(md.group(1))
+            candidate = _clean_list_candidate(md.group(1))
         else:
             # Plain-text fallback: remove numbering, URLs and image markers.
             plain = re.sub(r'^\s*\d+[.)]\s*', '', line)
             plain = re.sub(r'https?://\S+', ' ', plain)
             plain = re.sub(r'\(\s*image\s*\)', ' ', plain, flags=re.I)
             plain = re.sub(r'\[[^]]*image[^]]*\]', ' ', plain, flags=re.I)
-            plain = _clean_enemy_candidate(plain)
+            plain = _clean_list_candidate(plain)
             if plain:
                 candidate = plain
 
@@ -235,12 +246,10 @@ def parse_enemy_bulk(text):
         elif len(tokens) == 2 and tokens[0].casefold() == tokens[1].casefold():
             candidate = tokens[0]
 
-        # Nicknames in RK do not contain spaces in the examples we support.
-        # If noise remains after the first token, prefer the first token.
-        if ' ' in candidate:
-            first, rest = candidate.split(' ', 1)
-            if first.casefold() in rest.casefold().split():
-                candidate = first
+        # RK nicknames do not contain spaces: for bulk enemy/monitoring
+        # imports, the nickname always ends at the first whitespace. This
+        # deliberately turns labels such as "Artair Artair" into "Artair".
+        candidate = candidate.split()[0] if candidate.split() else ''
 
         candidate = candidate.strip()
         if not candidate or candidate.lower() in {'image', 'nickname', 'nome'}:
@@ -252,6 +261,11 @@ def parse_enemy_bulk(text):
             results.append(candidate)
 
     return results
+
+
+# Backward-compatible alias used by older tests/code.
+def parse_enemy_bulk(text):
+    return parse_bulk_names(text)
 
 
 def parse_groups(text):
@@ -347,12 +361,27 @@ def enemies_present_for(city, people):
     return present
 
 
+def monitored_present_for(city, people):
+    rows = MonitoredPerson.query.filter_by(province_id=city.province_id).all()
+    monitored_map = {m.nickname.casefold(): m for m in rows}
+    present = []
+    for person in people:
+        item = monitored_map.get(person['nickname'].casefold())
+        if item:
+            present.append(item)
+    return present
+
+
 def generate_bbcode(city, report_date, raw_sightings, people, groups, armies,
-                    previous_report=None, new_people=None, departed_people=None, existing_people=None, enemies_present=None):
+                    previous_report=None, new_people=None, departed_people=None, existing_people=None,
+                    enemies_present=None, monitored_present=None):
     new_people = new_people or []
     departed_people = departed_people or []
     existing_people = existing_people or []
     enemies_present = enemies_present or []
+    monitored_present = monitored_present or []
+    enemy_map = {e.nickname.casefold(): e for e in enemies_present}
+    monitored_map = {m.nickname.casefold(): m for m in monitored_present}
 
     lines = [
         '[quote]',
@@ -377,13 +406,36 @@ def generate_bbcode(city, report_date, raw_sightings, people, groups, armies,
     if not enemies_present:
         lines.append('Nessuna persona in lista nemici presente.')
 
+    lines += ['', f'[color=darkred][size=14][b][u]DA MONITORARE[/u] :[/b][/size][/color][color=blue][b]{len(monitored_present)}[/b][/color]', '']
+    for item in monitored_present:
+        monitored_line = f'[color=brown][b][char]{item.nickname}[/char][/b][/color]'
+        if item.note:
+            monitored_line += f' - [b]Motivo:[/b] {item.note}'
+        lines.append(monitored_line)
+    if not monitored_present:
+        lines.append('Nessuna persona da monitorare presente.')
+
     lines += ['', '[color=darkred][size=14][b][u]MOVIMENTI RISPETTO ALL’ULTIMO RAPPORTO[/u][/b][/size][/color]', '']
     if previous_report:
         lines.append(f'[b]Rapporto precedente:[/b] {previous_report.report_date.strftime("%d/%m/%Y")}')
         lines.append('')
         lines.append(f'[b]Arrivati:[/b] {len(new_people)}')
         for nickname in new_people:
-            lines.append(f'[char]{nickname}[/char]')
+            tags = []
+            enemy = enemy_map.get(nickname.casefold())
+            monitored = monitored_map.get(nickname.casefold())
+            if enemy:
+                label = '[color=red][b]NEMICO[/b][/color]'
+                if enemy.note:
+                    label += f' ({enemy.note})'
+                tags.append(label)
+            if monitored:
+                label = '[color=brown][b]DA MONITORARE[/b][/color]'
+                if monitored.note:
+                    label += f' ({monitored.note})'
+                tags.append(label)
+            suffix = ' - ' + ' - '.join(tags) if tags else ''
+            lines.append(f'[char]{nickname}[/char]{suffix}')
         lines.append('')
         lines.append(f'[b]Partiti:[/b] {len(departed_people)}')
         for nickname in departed_people:
@@ -435,7 +487,15 @@ def generate_bbcode(city, report_date, raw_sightings, people, groups, armies,
                 details.append(f'{enemy.nickname} ({enemy.note})')
             else:
                 details.append(enemy.nickname)
-        lines.append('[color=red][b]ATTENZIONE:[/b][/color] Nel rapporto risultano presenti persone in lista nemici: ' + ', '.join(details) + '.')
+        lines.append('[color=red][b]ATTENZIONE - NEMICI:[/b][/color] Nel rapporto risultano presenti persone in lista nemici: ' + ', '.join(details) + '.')
+    if monitored_present:
+        details = []
+        for item in monitored_present:
+            if item.note:
+                details.append(f'{item.nickname} ({item.note})')
+            else:
+                details.append(item.nickname)
+        lines.append('[color=brown][b]ATTENZIONE - DA MONITORARE:[/b][/color] Nel rapporto risultano presenti persone da monitorare: ' + ', '.join(details) + '.')
     lines.append('[/quote]')
     return '\n'.join(lines)
 
@@ -567,6 +627,7 @@ def new_report():
         city = db.session.get(City, city_id)
         previous_report, new_people, departed_people, existing_people = compare_with_previous_report(city_id, report_date, people)
         enemies_present = enemies_present_for(city, people)
+        monitored_present = monitored_present_for(city, people)
         bbcode = generate_bbcode(
             city, report_date, raw_sightings, people, groups, armies,
             previous_report=previous_report,
@@ -574,6 +635,7 @@ def new_report():
             departed_people=departed_people,
             existing_people=existing_people,
             enemies_present=enemies_present,
+            monitored_present=monitored_present,
         )
 
         import json
@@ -683,13 +745,13 @@ def enemies():
                 parsed = []
                 seen_edited = set()
                 for raw_name in request.form.getlist('parsed_names'):
-                    cleaned = _clean_enemy_candidate(raw_name)
+                    cleaned = _clean_list_candidate(raw_name)
                     cleaned = cleaned.split()[0] if cleaned.split() else ''
                     if cleaned and cleaned.casefold() not in seen_edited:
                         seen_edited.add(cleaned.casefold())
                         parsed.append(cleaned)
             else:
-                parsed = parse_enemy_bulk(bulk_text)
+                parsed = parse_bulk_names(bulk_text)
 
             if not province_id:
                 flash('Seleziona una provincia.', 'danger')
@@ -738,6 +800,103 @@ def delete_enemy(enemy_id):
     return redirect(url_for('enemies'))
 
 
+@app.route('/monitoring', methods=['GET', 'POST'])
+@login_required
+@role_required(ROLE_ADMIN, ROLE_PREFECT)
+def monitoring():
+    preview_names = []
+    preview_existing = []
+    bulk_text = ''
+    selected_province_id = current_user.province_id if current_user.role == ROLE_PREFECT else None
+
+    if request.method == 'POST':
+        action = request.form.get('action', 'single')
+        if current_user.role == ROLE_PREFECT:
+            province_id = current_user.province_id
+        else:
+            province_id = request.form.get('province_id', type=int)
+        selected_province_id = province_id
+
+        if action == 'single':
+            nickname = request.form.get('nickname', '').strip()
+            nickname = nickname.split()[0] if nickname.split() else ''
+            note = request.form.get('note', '').strip()
+            if not nickname or not province_id:
+                flash('Inserisci nickname e provincia.', 'danger')
+            else:
+                duplicate = MonitoredPerson.query.filter(
+                    MonitoredPerson.province_id == province_id,
+                    func.lower(MonitoredPerson.nickname) == nickname.lower()
+                ).first()
+                if duplicate:
+                    flash('Questa persona è già presente nella lista da monitorare della provincia.', 'warning')
+                else:
+                    db.session.add(MonitoredPerson(nickname=nickname, province_id=province_id, note=note))
+                    db.session.commit()
+                    flash(f'{nickname} aggiunto alle persone da monitorare.', 'success')
+            return redirect(url_for('monitoring'))
+
+        if action in {'bulk_preview', 'bulk_import'}:
+            bulk_text = request.form.get('bulk_text', '')
+            if action == 'bulk_import':
+                parsed = []
+                seen_edited = set()
+                for raw_name in request.form.getlist('parsed_names'):
+                    cleaned = _clean_list_candidate(raw_name)
+                    cleaned = cleaned.split()[0] if cleaned.split() else ''
+                    if cleaned and cleaned.casefold() not in seen_edited:
+                        seen_edited.add(cleaned.casefold())
+                        parsed.append(cleaned)
+            else:
+                parsed = parse_bulk_names(bulk_text)
+
+            if not province_id:
+                flash('Seleziona una provincia.', 'danger')
+            elif not parsed:
+                flash('Non sono riuscito a riconoscere alcun nickname nella lista incollata.', 'danger')
+            else:
+                existing_rows = MonitoredPerson.query.filter_by(province_id=province_id).all()
+                existing_map = {e.nickname.casefold(): e.nickname for e in existing_rows}
+                preview_existing = [n for n in parsed if n.casefold() in existing_map]
+                preview_names = [n for n in parsed if n.casefold() not in existing_map]
+
+                if action == 'bulk_import':
+                    for nickname in preview_names:
+                        db.session.add(MonitoredPerson(nickname=nickname, province_id=province_id, note=''))
+                    db.session.commit()
+                    flash(
+                        f'Importazione completata: {len(preview_names)} nuovi nominativi aggiunti, '
+                        f'{len(preview_existing)} già presenti ignorati.',
+                        'success'
+                    )
+                    return redirect(url_for('monitoring'))
+
+    provinces = Province.query.order_by(Province.name).all() if current_user.role == ROLE_ADMIN else []
+    q = MonitoredPerson.query.join(Province)
+    if current_user.role == ROLE_PREFECT:
+        q = q.filter(MonitoredPerson.province_id == current_user.province_id)
+    items = q.order_by(Province.name, MonitoredPerson.nickname).all()
+    return render_template(
+        'monitoring.html', monitored=items, provinces=provinces,
+        preview_names=preview_names, preview_existing=preview_existing,
+        bulk_text=bulk_text, selected_province_id=selected_province_id
+    )
+
+
+@app.route('/monitoring/<int:item_id>/delete', methods=['POST'])
+@login_required
+@role_required(ROLE_ADMIN, ROLE_PREFECT)
+def delete_monitored(item_id):
+    item = db.session.get(MonitoredPerson, item_id) or abort(404)
+    if current_user.role == ROLE_PREFECT and item.province_id != current_user.province_id:
+        abort(403)
+    nickname = item.nickname
+    db.session.delete(item)
+    db.session.commit()
+    flash(f'{nickname} rimosso dalle persone da monitorare.', 'success')
+    return redirect(url_for('monitoring'))
+
+
 @app.route('/account/password', methods=['GET', 'POST'])
 @login_required
 def change_password():
@@ -770,7 +929,7 @@ def users():
             or_(User.province_id == current_user.province_id, User.requested_province_id == current_user.province_id)
         ).order_by(User.created_at.desc()).all()
     provinces = Province.query.order_by(Province.name).all() if current_user.role == ROLE_ADMIN else []
-    return render_template('users.html', users=items, provinces=provinces)
+    return render_template('users.html', users=items, provinces=provinces, all_cities=City.query.order_by(City.name).all() if current_user.role == ROLE_ADMIN else [])
 
 
 @app.route('/users/<int:user_id>/approve', methods=['POST'])
@@ -785,8 +944,8 @@ def approve_user(user_id):
     user.approved = True
     user.province_id = user.requested_province_id
     db.session.commit()
-    flash(f'{user.nickname} approvato.', 'success')
-    return redirect(request.referrer or url_for('users'))
+    flash(f'{user.nickname} approvato. Ora assegna una o più città.', 'success')
+    return redirect(url_for('user_authorizations', user_id=user.id))
 
 
 @app.route('/users/<int:user_id>/reject', methods=['POST'])
@@ -821,6 +980,12 @@ def set_user_role(user_id):
     if province_id and not db.session.get(Province, province_id):
         abort(400)
 
+    selected_city_ids = {int(x) for x in request.form.getlist('city_ids') if x.isdigit()}
+    valid_city_ids = set()
+    if role == ROLE_OFFICER and province_id:
+        valid_city_ids = {c.id for c in City.query.filter_by(province_id=province_id).all()}
+        selected_city_ids &= valid_city_ids
+
     CityAuthorization.query.filter_by(user_id=user.id).delete()
     user.role = role
     user.approved = True
@@ -830,6 +995,9 @@ def set_user_role(user_id):
     else:
         user.province_id = province_id
         user.requested_province_id = province_id
+    if role == ROLE_OFFICER:
+        for city_id in selected_city_ids:
+            db.session.add(CityAuthorization(user_id=user.id, city_id=city_id))
     db.session.commit()
     labels = {ROLE_ADMIN: 'Admin Centrale', ROLE_PREFECT: 'Prefetto', ROLE_OFFICER: 'Doganiere'}
     flash(f'Ruolo di {user.nickname} aggiornato a {labels[role]}.', 'success')
@@ -893,18 +1061,21 @@ def locations():
 def seed():
     db.create_all()
     if Province.query.count() == 0:
-        firenze = Province(name='Repubblica Fiorentina')
-        siena = Province(name='Repubblica di Siena')
-        db.session.add_all([firenze, siena])
+        names = ['Firenze', 'Siena', 'Milano', 'Modena', 'Genova']
+        provinces = {name: Province(name=name) for name in names}
+        db.session.add_all(provinces.values())
         db.session.flush()
         db.session.add_all([
-            City(name='Firenze', province_id=firenze.id),
-            City(name='Pisa', province_id=firenze.id),
-            City(name='Piombino', province_id=firenze.id),
-            City(name='Siena', province_id=siena.id),
+            City(name='Firenze', province_id=provinces['Firenze'].id),
+            City(name='Pisa', province_id=provinces['Firenze'].id),
+            City(name='Piombino', province_id=provinces['Firenze'].id),
+            City(name='Siena', province_id=provinces['Siena'].id),
+            City(name='Milano', province_id=provinces['Milano'].id),
+            City(name='Modena', province_id=provinces['Modena'].id),
+            City(name='Genova', province_id=provinces['Genova'].id),
         ])
         db.session.commit()
-    firenze = Province.query.filter_by(name='Repubblica Fiorentina').first()
+    firenze = Province.query.filter(func.lower(Province.name).in_(['firenze', 'repubblica fiorentina'])).first()
     if not User.query.filter_by(nickname='admin').first():
         admin = User(nickname='admin', role=ROLE_ADMIN, approved=True)
         admin.set_password('admin123!')

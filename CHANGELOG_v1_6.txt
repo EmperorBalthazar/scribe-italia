@@ -1,0 +1,14 @@
+SCRIBE ITALIA v1.6 - CHANGELOG
+
+- Prefetti realmente limitati alla propria provincia per report, utenti, lista nemici e lista da monitorare.
+- Gestione Admin migliorata: per un Prefetto si sceglie la provincia; per un Doganiere si sceglie provincia e una o più città della stessa provincia.
+- Dopo l'approvazione di un Doganiere, si viene portati direttamente alla schermata di assegnazione città.
+- Nuova lista "Persone da monitorare" con inserimento singolo, motivo/nota, importazione massiva e anteprima modificabile.
+- Importazione massiva di Nemici e Da monitorare: il nickname termina sempre al primo spazio. Esempio: "Artair Artair" -> "Artair".
+- I vecchi alias (es. "già noto come") continuano a essere ignorati.
+- Nuova sezione BBCode "DA MONITORARE" con motivo/nota.
+- Gli Arrivati vengono marcati se sono NEMICI e/o DA MONITORARE, con relativo motivo.
+- I Partiti non vengono marcati come nemici/da monitorare perché non sono più presenti in città.
+- Nelle NOTE compaiono avvisi distinti per nemici e persone da monitorare presenti.
+- Una persona presente in entrambe le liste viene segnalata in entrambe le categorie.
+- Database compatibile con la v1.5: la nuova tabella delle persone da monitorare viene creata automaticamente con db.create_all().

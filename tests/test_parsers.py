@@ -70,3 +70,10 @@ Landry. , Baccard di Leostilla 255PR'''
         {'nickname': 'Melissende_', 'pr': 133},
         {'nickname': 'Landry.', 'pr': 255},
     ]
+
+
+def test_parse_bulk_names_first_space_rule():
+    from app import parse_bulk_names
+    text = '''- [Artair Artair](https://forum.renaissancekingdoms.com/viewtopic.php?p=97996353#) ([image](https://forum.renaissancekingdoms.com/images/icon_fiche.png)): Traitor since 26th May 1471
+- [Maso_donati Maso_donati](https://forum.example) già noto come Leonard_da_vinci'''
+    assert parse_bulk_names(text) == ['Artair', 'Maso_donati']

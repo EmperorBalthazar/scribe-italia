@@ -15,22 +15,35 @@
     {% if u.role == 'officer' and u.approved %}<a href="{{ url_for('user_authorizations', user_id=u.id) }}">Autorizza città</a>{% endif %}
     {% if current_user.role == 'admin' and u.id != current_user.id %}
       <details class="role-editor">
-        <summary>Modifica ruolo</summary>
-        <form method="post" action="{{ url_for('set_user_role', user_id=u.id) }}" class="role-form">
+        <summary>Modifica ruolo e assegnazioni</summary>
+        <form method="post" action="{{ url_for('set_user_role', user_id=u.id) }}" class="role-form role-assignment-form">
           <label>Ruolo
-            <select name="role" required>
+            <select name="role" class="role-select" required>
               <option value="officer" {% if u.role == 'officer' %}selected{% endif %}>Doganiere</option>
               <option value="prefect" {% if u.role == 'prefect' %}selected{% endif %}>Prefetto</option>
               <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin Centrale</option>
             </select>
           </label>
           <label>Provincia
-            <select name="province_id">
+            <select name="province_id" class="province-select">
               <option value="">Nessuna / non applicabile</option>
               {% for p in provinces %}<option value="{{ p.id }}" {% if u.province_id == p.id or (not u.province_id and u.requested_province_id == p.id) %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
             </select>
           </label>
-          <button class="primary small" type="submit">Salva ruolo</button>
+          <div class="officer-city-picker">
+            <span class="field-label">Città assegnate al Doganiere</span>
+            <div class="checkbox-list city-auth-list compact-city-list">
+              {% set current_ids = u.city_authorizations|map(attribute='city_id')|list %}
+              {% for c in all_cities %}
+              <label class="city-auth-row city-option" data-province-id="{{ c.province_id }}">
+                <span>{{ c.name }}</span>
+                <input type="checkbox" name="city_ids" value="{{ c.id }}" {% if c.id in current_ids %}checked{% endif %}>
+              </label>
+              {% endfor %}
+            </div>
+            <small class="muted">Le città mostrate dipendono dalla provincia selezionata.</small>
+          </div>
+          <button class="primary small" type="submit">Salva ruolo e assegnazioni</button>
         </form>
       </details>
     {% endif %}
@@ -38,4 +51,26 @@
 </tr>
 {% endfor %}
 </tbody></table>
+<script>
+document.querySelectorAll('.role-assignment-form').forEach(form => {
+  const role = form.querySelector('.role-select');
+  const province = form.querySelector('.province-select');
+  const picker = form.querySelector('.officer-city-picker');
+  const options = [...form.querySelectorAll('.city-option')];
+
+  function refresh() {
+    const isOfficer = role.value === 'officer';
+    picker.style.display = isOfficer ? 'block' : 'none';
+    const provinceId = province.value;
+    options.forEach(row => {
+      const visible = isOfficer && provinceId && row.dataset.provinceId === provinceId;
+      row.style.display = visible ? 'flex' : 'none';
+      if (!visible) row.querySelector('input').checked = false;
+    });
+  }
+  role.addEventListener('change', refresh);
+  province.addEventListener('change', refresh);
+  refresh();
+});
+</script>
 {% endblock %}
