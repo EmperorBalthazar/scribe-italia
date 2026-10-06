@@ -1,0 +1,21 @@
+{% extends 'base.html' %}{% block content %}
+<h1>Storico rapporti</h1>
+<table><thead><tr><th>Data</th><th>Città</th><th>Provincia</th><th>Autore</th><th>Azioni</th></tr></thead><tbody>
+{% for r in reports %}
+<tr>
+  <td>{{ r.report_date.strftime('%d/%m/%Y') }}</td>
+  <td>{{ r.city.name }}</td>
+  <td>{{ r.city.province.name }}</td>
+  <td>{{ r.author.nickname }}</td>
+  <td class="actions">
+    <a href="{{ url_for('view_report', report_id=r.id) }}">Apri</a>
+    {% if current_user.role in ['admin','prefect'] %}
+    <form method="post" action="{{ url_for('delete_report', report_id=r.id) }}" onsubmit="return confirm('Eliminare definitivamente questo rapporto?');">
+      <button class="danger small" type="submit">Elimina</button>
+    </form>
+    {% endif %}
+  </td>
+</tr>
+{% else %}<tr><td colspan="5">Nessun rapporto disponibile.</td></tr>{% endfor %}
+</tbody></table>
+{% endblock %}

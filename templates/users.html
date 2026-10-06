@@ -1,0 +1,9 @@
+{% extends 'base.html' %}{% block content %}
+<h1>Gestione utenti</h1>
+<table><thead><tr><th>Nickname</th><th>Ruolo</th><th>Provincia</th><th>Stato</th><th>Azioni</th></tr></thead><tbody>
+{% for u in users %}<tr><td>{{ u.nickname }}</td><td>{{ u.role }}</td><td>{{ u.province.name if u.province else (u.requested_province.name if u.requested_province else '-') }}</td><td>{{ 'Approvato' if u.approved else 'In attesa' }}</td><td>
+{% if u.role == 'officer' and not u.approved %}<form class="inline" method="post" action="{{ url_for('approve_user', user_id=u.id) }}"><button>Approva</button></form><form class="inline" method="post" action="{{ url_for('reject_user', user_id=u.id) }}"><button class="danger-btn">Rifiuta</button></form>{% endif %}
+{% if u.role == 'officer' and u.approved %}<a href="{{ url_for('user_authorizations', user_id=u.id) }}">Autorizza città</a>{% endif %}
+</td></tr>{% endfor %}
+</tbody></table>
+{% endblock %}

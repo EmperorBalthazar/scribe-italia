@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% block title %}Registrazione - Scribe Italia{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <h1>Registrazione</h1>
+  <form method="post">
+    <label>Nickname<input name="nickname" required></label>
+    <label>Password<input type="password" name="password" minlength="6" required></label>
+    <label>Provincia richiesta
+      <select name="province_id" required><option value="">Seleziona...</option>{% for p in provinces %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
+    </label>
+    <button class="primary">Registrati</button>
+  </form>
+  <p>Dopo la registrazione dovrai attendere l'approvazione del Prefetto.</p>
+</div>
+{% endblock %}

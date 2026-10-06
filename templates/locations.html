@@ -1,0 +1,5 @@
+{% extends 'base.html' %}{% block content %}
+<h1>Province e città</h1>
+<div class="grid two"><section><h2>Nuova provincia</h2><form method="post"><input type="hidden" name="action" value="province"><label>Nome<input name="province_name" required></label><button class="primary">Crea provincia</button></form><h3>Province</h3><ul>{% for p in provinces %}<li>{{ p.name }}</li>{% endfor %}</ul></section>
+<section><h2>Nuova città</h2><form method="post"><input type="hidden" name="action" value="city"><label>Nome<input name="city_name" required></label><label>Provincia<select name="province_id" required>{% for p in provinces %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></label><button class="primary">Crea città</button></form><h3>Città</h3><ul>{% for c in cities %}<li>{{ c.name }} — {{ c.province.name }}</li>{% endfor %}</ul></section></div>
+{% endblock %}

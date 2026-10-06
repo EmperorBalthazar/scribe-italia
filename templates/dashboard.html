@@ -1,0 +1,12 @@
+{% extends 'base.html' %}{% block content %}
+<h1>Dashboard</h1>
+<p>Benvenuto, <strong>{{ current_user.nickname }}</strong>.</p>
+<div class="cards">
+  <a class="card" href="{{ url_for('new_report') }}"><h3>Nuovo rapporto</h3><p>Compila le quattro caselle e genera il BBCode.</p></a>
+  <a class="card" href="{{ url_for('reports') }}"><h3>Storico rapporti</h3><p>Consulta i rapporti già creati.</p></a>
+  {% if current_user.role in ['admin','prefect'] %}<a class="card" href="{{ url_for('users') }}"><h3>Gestione utenti</h3><p>Approva doganieri e gestisci autorizzazioni.</p></a>{% endif %}
+</div>
+<h2>Città disponibili</h2>
+{% if cities %}<ul>{% for c in cities %}<li>{{ c.name }} — {{ c.province.name }}</li>{% endfor %}</ul>{% else %}<p>Nessuna città autorizzata.</p>{% endif %}
+{% if pending %}<h2>Richieste in attesa</h2><ul>{% for u in pending %}<li>{{ u.nickname }} — {{ u.requested_province.name if u.requested_province else 'Provincia non specificata' }}</li>{% endfor %}</ul>{% endif %}
+{% endblock %}

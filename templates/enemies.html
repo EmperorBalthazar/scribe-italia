@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}Lista nemici{% endblock %}
+{% block content %}
+<h1>Lista nemici</h1>
+<p class="muted">I nominativi inseriti qui vengono confrontati automaticamente con le persone presenti nei nuovi rapporti. Ogni Prefetto gestisce soltanto la lista della propria provincia.</p>
+
+<section class="card">
+  <h2>Aggiunta singola</h2>
+  <form method="post" class="form-grid">
+    <input type="hidden" name="action" value="single">
+    <label>Nickname
+      <input type="text" name="nickname" required placeholder="Es. Nomepersonaggio">
+    </label>
+    {% if current_user.role == 'admin' %}
+    <label>Provincia
+      <select name="province_id" required>
+        <option value="">Seleziona provincia</option>
+        {% for p in provinces %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <label>Nota facoltativa
+      <input type="text" name="note" maxlength="255" placeholder="Motivo o riferimento interno">
+    </label>
+    <div><button class="primary" type="submit">Aggiungi alla lista nemici</button></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Importazione massiva</h2>
+  <p class="muted">Incolla direttamente una lista dal forum. I nickname ripetuti due volte vengono riconosciuti automaticamente e le diciture “già noto come” vengono ignorate.</p>
+  <form method="post">
+    <input type="hidden" name="action" value="bulk_preview">
+    {% if current_user.role == 'admin' %}
+    <label>Provincia
+      <select name="province_id" required>
+        <option value="">Seleziona provincia</option>
+        {% for p in provinces %}<option value="{{ p.id }}" {% if selected_province_id == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <label>Lista da importare
+      <textarea name="bulk_text" rows="12" placeholder="Incolla qui la lista nemici...">{{ bulk_text }}</textarea>
+    </label>
+    <button class="primary" type="submit">Analizza lista</button>
+  </form>
+
+  {% if preview_names or preview_existing %}
+  <div class="bulk-preview">
+    <h3>Anteprima importazione</h3>
+    <p><strong>{{ preview_names|length }}</strong> nuovi nominativi riconosciuti; <strong>{{ preview_existing|length }}</strong> già presenti.</p>
+    {% if preview_names %}
+      <div class="name-grid">
+        {% for n in preview_names %}<span class="name-chip">✓ {{ n }}</span>{% endfor %}
+      </div>
+    {% endif %}
+    {% if preview_existing %}
+      <p class="muted"><strong>Già presenti e non duplicati:</strong> {{ preview_existing|join(', ') }}</p>
+    {% endif %}
+    <form method="post" class="confirm-import">
+      <input type="hidden" name="action" value="bulk_import">
+      {% if current_user.role == 'admin' %}<input type="hidden" name="province_id" value="{{ selected_province_id }}">{% endif %}
+      <textarea name="bulk_text" hidden>{{ bulk_text }}</textarea>
+      <button class="primary" type="submit">Importa {{ preview_names|length }} nuovi nominativi</button>
+    </form>
+  </div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Persone registrate</h2>
+  <table>
+    <thead><tr><th>Nickname</th><th>Provincia</th><th>Nota</th><th></th></tr></thead>
+    <tbody>
+      {% for e in enemies %}
+      <tr>
+        <td><strong>{{ e.nickname }}</strong></td>
+        <td>{{ e.province.name }}</td>
+        <td>{{ e.note or '—' }}</td>
+        <td>
+          <form method="post" action="{{ url_for('delete_enemy', enemy_id=e.id) }}" onsubmit="return confirm('Rimuovere {{ e.nickname }} dalla lista nemici?');">
+            <button class="danger" type="submit">Rimuovi</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">Nessuna persona presente nella lista nemici.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

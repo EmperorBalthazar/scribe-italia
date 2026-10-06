@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% block title %}Nuovo rapporto - Scribe Italia{% endblock %}
+{% block content %}
+<h1>Nuovo rapporto</h1>
+<form method="post" class="report-form">
+  <div class="grid two">
+    <label>Città<select name="city_id" required>{% for c in cities %}<option value="{{ c.id }}" {% if form_data and form_data.city_id == c.id %}selected{% endif %}>{{ c.name }} — {{ c.province.name }}</option>{% endfor %}</select></label>
+    <label>Data<input type="date" name="report_date" value="{{ today }}" required></label>
+  </div>
+  <label>1. Persone in città<textarea name="people" rows="10" placeholder="Incolla qui la lista delle persone..." required>{{ form_data.people if form_data else '' }}</textarea></label>
+  <label>2. Gruppi<textarea name="groups" rows="10" placeholder="Incolla qui gruppi e lance...">{{ form_data.groups if form_data else '' }}</textarea></label>
+  <label>3. Eserciti<textarea name="armies" rows="6" placeholder="Scrivi Nessuno oppure incolla gli eserciti...">{{ form_data.armies if form_data else '' }}</textarea></label>
+  <label>4. Avvistamenti / avvenimenti<textarea name="sightings" rows="6" placeholder="Incolla qui gli avvistamenti...">{{ form_data.sightings if form_data else '' }}</textarea></label>
+  <button class="primary big">Genera rapporto</button>
+</form>
+{% endblock %}
