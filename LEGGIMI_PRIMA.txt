@@ -1,0 +1,19 @@
+SCRIBE ITALIA MVP v1.3
+
+1) Se hai già usato la v1.2, puoi estrarre questi file sopra la stessa cartella e scegliere "Sostituisci".
+2) Chiudi prima AVVIA_SCRIBE.bat / la finestra del server.
+3) Esegui di nuovo INSTALLA_SCRIBE.bat (non cancella il database esistente).
+4) Avvia AVVIA_SCRIBE.bat.
+5) Apri http://127.0.0.1:5000
+
+NOVITÀ v1.3
+- Lista nemici gestibile da Prefetti e Admin.
+- Segnalazione automatica "PERSONE IN LISTA NEMICI" nel rapporto.
+- Confronto con l'ultimo rapporto precedente della stessa città.
+- Nuovi presenti, non più presenti e conteggio dei già presenti.
+- Eliminazione rapporti per Admin e Prefetti.
+- Rimossa la scritta "Rapporto generato automaticamente da Scribe Italia."
+- Rimossi i PR dalla lista principale del BBCode.
+- Nessun uso di spoiler.
+
+Il database scribe_italia.db viene mantenuto se aggiorni nella stessa cartella.
